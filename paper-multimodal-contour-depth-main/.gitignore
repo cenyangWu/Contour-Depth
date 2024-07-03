@@ -1,0 +1,13 @@
+*.pyc
+.DS_Store
+.vscode
+*.png
+*.svg
+*.pkl
+*.csv
+*.npy
+*.npz
+*.pl.nc
+__pychache__
+!fig-header.png
+archive
