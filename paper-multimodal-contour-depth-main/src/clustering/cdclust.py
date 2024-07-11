@@ -33,6 +33,7 @@ def multiscale_kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="ecbd"
 
     best_depth_sum = -np.inf
     best_cluster_assignment = None
+    return 0
     for _ in range(num_attempts):
         print(_)
         cluster_assignment = rng.integers(low=0, high=num_clusters, size=num_masks)
