@@ -19,7 +19,7 @@ def multiscale_kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="ecbd"
     num_masks = masks.shape[0]
     size_row = masks.shape[1]
     size_col = masks.shape[2]
-
+    np.set_printoptions(threshold=np.inf)
     if seed is None:
         rng = np.random.default_rng()
     else:
@@ -41,8 +41,8 @@ def multiscale_kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="ecbd"
             depth_in_cluster = np.empty((num_clusters, size_row-size_window, size_col-size_window, num_masks), dtype=np.float32)
             for i in range (size_row-size_window):
                 for j in range (size_col-size_window):
+                    window = np.zeros((num_masks,size_window, size_window), dtype=np.float32)
                     for k in range (num_masks):
-                        window = np.zeros((num_masks,size_window, size_window))
                         window[k] = masks[k,i:i+size_window,j:j+size_window]
                     if depth == "eid" or depth == "ecbd":
                         inclusion_matrix = compute_epsilon_inclusion_matrix(window)
