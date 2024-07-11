@@ -31,7 +31,15 @@ def compute_epsilon_inclusion_matrix(masks):
     masks = np.array(masks).astype(int)
     inclusion_mat = np.zeros((num_masks, num_masks))
     inv_masks = 1 - masks
+    area = np.sum(masks, axis=(1, 2))
+    
     for i in range(num_masks):
-        inclusion_mat[i, :] = 1 - np.sum(inv_masks & masks[i], axis=(1, 2)) / np.sum(masks[i])
-        inclusion_mat[i, i] = 0
+        if area[i] > 0:  # Check to prevent division by zero
+            inclusion_scores = 1 - np.sum(inv_masks & masks[i], axis=(1, 2)) / area[i]
+        else:
+            inclusion_scores = np.zeros(num_masks)  # If mask area is 0, set all relations to 0
+            
+        inclusion_mat[i, :] = inclusion_scores
+        inclusion_mat[i, i] = 0  # Set diagonal to 0 as a mask cannot include itself
+
     return inclusion_mat
