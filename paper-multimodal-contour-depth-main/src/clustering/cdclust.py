@@ -128,7 +128,6 @@ def largest_depth(masks,depth="eid", metric="depth"):
         if depth == "cbd" or depth == "id" or depth == "eid":
             N_a = np.sum(inclusion_matrix[i])
             N_b = np.sum(inclusion_matrix.T[i])
-        print(N_a.shape)
 
         if depth == "cbd":
             N_ab_range = N
@@ -140,7 +139,7 @@ def largest_depth(masks,depth="eid", metric="depth"):
             best_id = i
     print(best_id)
     print(best_depth)
-    return masks[best_id]
+    return masks[best_id], best_id
 
 def multiscale_kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="ecbd", metric="depth", num_attempts=5, size_window=60,max_num_iterations=10, seed=42):
     assert(depth in ["eid", "id", "cbd", "ecbd"])

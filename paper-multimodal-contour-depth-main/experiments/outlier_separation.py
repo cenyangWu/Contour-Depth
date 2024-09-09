@@ -104,11 +104,8 @@ if __name__ == "__main__":
     # axes[1].set_title("boundaries")
    
     # plt.show()
-    # 定义一个函数来提取所有掩模的轮廓
+    # 定义一个函数来提取所有掩模的轮廓 
     
-    
-
-# 假设masks是一个numpy数组，包含100个掩模，best_id是已经计算得到的索引
     plot_spaghetti(masks, 89)
 
     ###################
