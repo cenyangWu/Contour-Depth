@@ -117,7 +117,7 @@ if __name__ == "__main__":
     pred_labs1 = get_cvp_clustering(pca_mat, num_components=K)
     pred_labs2 = kmeans_cluster_inclusion_matrix(masks, num_clusters=K, depth="id", num_attempts=10, max_num_iterations=30, seed=SEED_CLUSTER)
     pred_labs3 = initial_clustering(masks, num_components=K, feat_mat=pca_mat, method="kmeans", k_means_n_init=5, k_means_max_iter=10, seed=SEED_CLUSTER)
-    pred_labs4 = multiscale_kmeans_cluster_inclusion_matrix(masks, num_clusters=K, depth="eid", num_attempts=5,size_window=10, max_num_iterations=10, seed=SEED_CLUSTER)
+    pred_labs4 = kmeans_cluster_inclusion_matrix(masks, num_clusters=K, depth="id", num_attempts=10, max_num_iterations=30, seed=SEED_CLUSTER)
     print(pred_labs4.shape)
     print(f"CVP: {adjusted_rand_score(labs, pred_labs1)}")
     print(f"CDclust: {adjusted_rand_score(labs, pred_labs2)}")

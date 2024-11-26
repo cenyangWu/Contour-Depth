@@ -8,7 +8,9 @@ from skimage.measure import find_contours
 from sklearn.decomposition import KernelPCA,PCA
 from sklearn.cluster import AgglomerativeClustering
 import matplotlib.cm as cm
-
+from scipy.interpolate import splprep, splev
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.colors import ListedColormap
 # Define necessary functions
 def circle_ensemble(num_masks, num_rows, num_cols, center_mean=(0.5, 0.5), center_std=(0, 0),
                     radius_mean=0.25, radius_std=0.25 * 0.1, seed=None):
@@ -118,11 +120,11 @@ for k in range(num_samples):
 
 # Extract contours from window
 contours = extract_contours(window)
-
+print(contours)
 # Number of points to sample along each contour
 N = 50
 sampled_contours = []
-
+# Sampling
 for contour in contours:
     if contour.size == 0:
         # If contour is empty, use zeros
@@ -154,8 +156,8 @@ flattened_contours = [points.flatten() for points in sampled_contours]
 flattened_array = np.array(flattened_contours)
 
 # Perform Kernel PCA
+kpca = PCA(n_components=8)
 kpca = KernelPCA(n_components=8, kernel='rbf', gamma=1e-4)
-#kpca = PCA(n_components=8)
 
 contours_kpca = kpca.fit_transform(flattened_array)
 means = np.mean(contours_kpca, axis=0)
@@ -164,102 +166,62 @@ print(means)
 print(variances)
 # Clustering using Agglomerative Hierarchical Clustering (AHC)
 # Initialize AHC with 2 clusters
+
+
+# (Assuming all previous code up to clustering remains the same)
+
+# Clustering using Agglomerative Hierarchical Clustering (AHC)
+# Initialize AHC with 2 clusters
 ahc = AgglomerativeClustering(n_clusters=2, affinity='euclidean', linkage='ward')
 cluster_labels = ahc.fit_predict(contours_kpca)
-print(cluster_labels.shape)
-# contours_kpca: Kernel PCA 转换后的数据
-# cluster_labels: 聚类标签
-# sampled_contours: 原始轮廓的采样点
 
-# 1. 计算每个聚类的中心
-n_clusters = ahc.n_clusters
-cluster_centers = np.zeros((n_clusters, contours_kpca.shape[1]))
-for k in range(n_clusters):
-    cluster_points = contours_kpca[cluster_labels == k]
-    cluster_centers[k] = np.mean(cluster_points, axis=0)
+# Compute the overall center in KPCA space
+overall_center = np.mean(contours_kpca, axis=0)
 
-# 2. 计算每个元素到其类别中心的距离
-distances_to_center = np.zeros(len(contours_kpca))
-for i in range(len(contours_kpca)):
-    cluster = cluster_labels[i]
-    center = cluster_centers[cluster]
-    distances_to_center[i] = np.linalg.norm(contours_kpca[i] - center)
+# Compute the distance of each element to the overall center
+distances_to_center = np.linalg.norm(contours_kpca - overall_center, axis=1)
 
-# 3. 归一化距离并在每个聚类内排序
-normalized_distances = np.zeros_like(distances_to_center)
-for k in range(n_clusters):
-    cluster_indices = np.where(cluster_labels == k)[0]
-    cluster_distances = distances_to_center[cluster_indices]
-    min_dist = cluster_distances.min()
-    max_dist = cluster_distances.max()
-    if max_dist > min_dist:
-        normalized = (cluster_distances - min_dist) / (max_dist - min_dist)
-    else:
-        normalized = np.zeros_like(cluster_distances)
-    normalized_distances[cluster_indices] = normalized
-
-# 4. 为每个聚类分配反转的颜色映射
-colormaps = ['Reds_r', 'Blues_r', 'Greens_r', 'Purples_r', 'Oranges_r']  # 使用反转的颜色映射
-colormaps = colormaps[:n_clusters]  # 确保颜色映射数量与聚类数一致
-
-# 创建一个图形
+# Normalize distances over all elements
+min_dist = distances_to_center.min()
+max_dist = distances_to_center.max()
+normalized_distances = (distances_to_center - min_dist) / (max_dist - min_dist)
+print(normalized_distances)
+# Visualization
+# Create a figure
 fig, ax = plt.subplots(figsize=(8, 8))
 
-# 5. 绘制轮廓，使用由深到浅的颜色编码聚类内的排序
-for k in range(n_clusters):
-    cluster_indices = np.where(cluster_labels == 0)[0]
-    cmap = plt.get_cmap(colormaps[k])
-    # 对于聚类内的每个元素，根据其归一化距离分配颜色
-    for idx in cluster_indices:
-        contour = sampled_contours[idx]
-        distance = normalized_distances[idx]
-        color = cmap(distance*0.7)
-        ax.plot(contour[:, 0], contour[:, 1], color=color, linewidth=1)
+# Use a single colormap
+cmap = plt.get_cmap('viridis_r')
+
+# Plot contours, coloring based on normalized distances to overall center
+for idx in range(len(sampled_contours)):
+    contour = sampled_contours[idx]
+    distance = normalized_distances[idx]
+    color = cmap(distance)
+    ax.plot(contour[:, 0], contour[:, 1], color=color, linewidth=1)
 
 ax.invert_yaxis()
-ax.set_title('Contours Color-Coded by Distance to Cluster Center (Dark to Light)')
+ax.set_title('Contours Color-Coded by Distance to Overall Center (Dark to Light)')
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 
-# 6. 添加颜色条
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+# Add colorbar
 divider = make_axes_locatable(ax)
 cax = divider.append_axes("right", size="5%", pad=0.05)
 
-# 创建合并的颜色映射以显示颜色条
-from matplotlib.colors import ListedColormap
-
-colors_list = []
-for k in range(n_clusters):
-    cmap = plt.get_cmap(colormaps[k])
-    colors_list.append(cmap(np.linspace(0, 1, 256)))
-
-# 将颜色列表展平
-combined_colors = np.vstack(colors_list)
-combined_cmap = ListedColormap(combined_colors)
-
-# 创建归一化对象
-norm = plt.Normalize(vmin=0, vmax=n_clusters)
-
-# 创建颜色条
-sm = cm.ScalarMappable(cmap=combined_cmap, norm=norm)
+# Create colorbar
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=1))
 sm.set_array([])
 
-# 设置颜色条刻度和标签
-cbar = fig.colorbar(sm, cax=cax, ticks=np.linspace(0.5, n_clusters - 0.5, n_clusters))
-cbar.ax.set_yticklabels([f'Cluster {k}' for k in range(n_clusters)])
-cbar.set_label('Clusters (Dark to Light: Near to Far)')
+cbar = plt.colorbar(sm, cax=cax)
+cbar.set_label('Normalized Distance to Overall Center (0: Near, 1: Far)')
 
 plt.show()
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.interpolate import splprep, splev
 
-# 创建一个包含两个子图的图形
+# Plotting in Kernel PCA Space with clusters and true labels
 fig, ax = plt.subplots(1, 2, figsize=(16, 6))
 
-# 第一个子图：Clusters in Kernel PCA Space
+# First subplot: Clusters in Kernel PCA Space
 scatter1 = ax[0].scatter(contours_kpca[:, 0], contours_kpca[:, 1], c=cluster_labels, cmap='viridis')
 ax[0].set_xlabel('Kernel PCA Component 1')
 ax[0].set_ylabel('Kernel PCA Component 2')
@@ -267,7 +229,7 @@ ax[0].set_title('Clusters in Kernel PCA Space')
 cbar1 = fig.colorbar(scatter1, ax=ax[0])
 cbar1.set_label('Cluster Label')
 
-# 第二个子图：True Labels in Kernel PCA Space
+# Second subplot: True Labels in Kernel PCA Space
 scatter2 = ax[1].scatter(contours_kpca[:, 0], contours_kpca[:, 1], c=true_labels, cmap='coolwarm')
 ax[1].set_xlabel('Kernel PCA Component 1')
 ax[1].set_ylabel('Kernel PCA Component 2')
@@ -275,24 +237,23 @@ ax[1].set_title('True Labels in Kernel PCA Space')
 cbar2 = fig.colorbar(scatter2, ax=ax[1])
 cbar2.set_label('True Label')
 
-# 显示两个子图
 plt.tight_layout()
 plt.show()
 
-# 绘制所有轮廓，并使用平滑曲线进行颜色编码
+# Plot all contours with smoothing, colored by cluster labels
 plt.figure(figsize=(8, 8))
 colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
 
-# 遍历每一个轮廓，并进行 B 样条插值
+# Iterate over each contour and perform B-spline interpolation
 for i, sampled_points in enumerate(sampled_contours):
     cluster = cluster_labels[i]
     
-    # 进行插值
+    # Perform interpolation
     tck, u = splprep([sampled_points[:, 0], sampled_points[:, 1]], s=0)
-    unew = np.linspace(0, 1, 200)  # 增加采样点的数量
+    unew = np.linspace(0, 1, 200)
     x_smooth, y_smooth = splev(unew, tck)
     
-    # 绘制平滑的曲线
+    # Plot the smooth curve
     plt.plot(x_smooth, y_smooth, color=colors[cluster % len(colors)], linewidth=1)
 
 plt.gca().invert_yaxis()
@@ -301,7 +262,7 @@ plt.xlabel('X')
 plt.ylabel('Y')
 plt.show()
 
-# 显示原始轮廓和聚类标签
+# Display original contours and cluster labels
 fig, axes = plt.subplots(5, 10, figsize=(20, 10))
 axes = axes.ravel()
 for i in range(num_samples):
@@ -310,3 +271,4 @@ for i in range(num_samples):
     axes[i].axis('off')
 plt.tight_layout()
 plt.show()
+

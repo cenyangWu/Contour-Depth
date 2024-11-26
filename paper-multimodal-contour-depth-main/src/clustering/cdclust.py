@@ -109,6 +109,37 @@ def multiscale_cluster_inclusion_matrix(masks, num_clusters, depth="ecbd", metri
                 best_depth_sum = depth_sum
 
     return best_cluster_assignment
+def sorted_depth(masks, depth="eid", metric="depth"):
+    masks = np.array(masks, dtype=np.float32)
+    num_masks = masks.shape[0]
+    np.set_printoptions(threshold=np.inf)
+    assert(depth in ["eid", "id", "cbd"])
+    assert(metric in ["depth", "red"])
+    if depth == "eid" or depth == "ecbd":
+        inclusion_matrix = compute_epsilon_inclusion_matrix(masks)
+        np.fill_diagonal(inclusion_matrix, 1)  # Required for feature parity with the O(N) version of eID.
+    else:
+        inclusion_matrix = compute_inclusion_matrix(masks)
+    N = num_masks
+    depths = np.zeros(num_masks)  # 用于存储每个掩码的深度值
+
+    for i in range(num_masks):
+        if depth in ["cbd", "id", "eid"]:
+            N_a = np.sum(inclusion_matrix[i])
+            N_b = np.sum(inclusion_matrix.T[i])
+
+        if depth == "cbd":
+            N_ab_range = N
+            depth_in_cluster = (N_a * N_b) / (N_ab_range * N_ab_range)
+        else:  # ID / eID
+            depth_in_cluster = np.minimum(N_a, N_b) / N
+
+        depths[i] = depth_in_cluster  # 存储当前掩码的深度值
+
+    # 对深度值进行排序，获取排序后的索引
+    sorted_indices = np.argsort(depths)
+
+    return sorted_indices
 
 def largest_depth(masks,depth="eid", metric="depth"):
     masks = np.array(masks, dtype=np.float32)
@@ -163,7 +194,6 @@ def multiscale_kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="ecbd"
     best_depth_sum = -np.inf
     best_cluster_assignment = None
     for _ in range(num_attempts):
-        print(_)
         cluster_assignment = rng.integers(low=0, high=num_clusters, size=num_masks)
         # 生成随机的分类
         for _ in range(max_num_iterations):
@@ -228,7 +258,6 @@ def multiscale_kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="ecbd"
             # print(metric_values)
             cluster_assignment = np.argmax(metric_values, axis=0)
             # print(cluster_assignment)
-            print("try")
             if not check_valid_assignment(cluster_assignment, num_clusters) or np.all(cluster_assignment == old_cluster_assignment):
                 best_cluster_assignment = cluster_assignment
                 print("best")
@@ -240,7 +269,6 @@ def multiscale_kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="ecbd"
                 best_depth_sum = depth_sum
 
     return best_cluster_assignment
-
 
 def kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="eid", metric="depth", num_attempts=5, max_num_iterations=10, seed=42):
     assert(depth in ["eid", "id", "cbd"])
@@ -269,7 +297,6 @@ def kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="eid", metric="de
     best_cluster_assignment = None
     for _ in range(num_attempts):
         cluster_assignment = rng.integers(low=0, high=num_clusters, size=num_masks)
-        # print(cluster_assignment)
         for _ in range(max_num_iterations):
             depth_in_cluster = np.empty((num_clusters, num_masks), dtype=np.float32)
             for c in range(num_clusters):
@@ -293,6 +320,7 @@ def kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="eid", metric="de
                 #    j_in_i = inclusion_matrix.T[:,j_in_cluster]
                 #    # We need to normalize the depth such that it is  not dependent on the number of contours in the cluster.
                 #    depth_in_cluster[c] = np.minimum(i_in_j, j_in_i) / N
+
             if metric == "depth":
                 metric_values = depth_in_cluster
             else: # Relative Depth (ReD)
@@ -304,12 +332,10 @@ def kmeans_cluster_inclusion_matrix(masks, num_clusters, depth="eid", metric="de
                     depth_within = depth_in_cluster[c,:]
                     red[c,:] = depth_within - depth_between
                 metric_values = red
-            # print(metric_values)
+
             old_cluster_assignment = cluster_assignment
             cluster_assignment = np.argmax(metric_values, axis=0)
-            # print(cluster_assignment)
             if not check_valid_assignment(cluster_assignment, num_clusters) or np.all(cluster_assignment == old_cluster_assignment):
-                print("best")
                 break
 
             depth_sum = np.sum(np.choose(cluster_assignment, metric_values))
@@ -417,6 +443,7 @@ def multiscale_kmeans_cluster_eid(masks, num_clusters, metric="depth", num_attem
 
     return best_cluster_assignment
 
+
 def kmeans_cluster_eid(masks, num_clusters, metric="depth", num_attempts=5, max_num_iterations=10, seed=42):
     assert(metric in ["depth", "red"])
 
@@ -482,6 +509,7 @@ def kmeans_cluster_eid(masks, num_clusters, metric="depth", num_attempts=5, max_
                 best_cluster_assignment = cluster_assignment
                 best_depth_sum = depth_sum
     return best_cluster_assignment
+
 
 #################################
 # Competing cluster computation #
